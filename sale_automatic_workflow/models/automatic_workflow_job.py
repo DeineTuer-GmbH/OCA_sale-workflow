@@ -130,23 +130,22 @@ class AutomaticWorkflowJob(models.Model):
             with savepoint(self.env.cr):
                 self._do_validate_picking(picking, picking_filter)
 
-    def _do_sale_done(self, sale, domain_filter):
-        """Set a sales order to done, filter ensure no duplication"""
+    def _do_sale_lock(self, sale, domain_filter):
+        """Lock a sales order, filter ensure no duplication"""
         if not self.env["sale.order"].search_count(
             [("id", "=", sale.id)] + domain_filter
         ):
             return f"{sale.display_name} {sale} job bypassed"
-        sale.action_done()
-        return f"{sale.display_name} {sale} set done successfully"
+        sale.action_lock()
+        return f"{sale.display_name} {sale} locked successfully"
 
     @api.model
-    def _sale_done(self, sale_done_filter):
-        sale_obj = self.env["sale.order"]
-        sales = sale_obj.search(sale_done_filter)
-        _logger.debug("Sale Orders to done: %s", sales.ids)
+    def _sale_lock(self, sale_lock_filter):
+        sales = self.env["sale.order"].search(sale_lock_filter)
+        _logger.debug("Sale Orders to lock: %s", sales.ids)
         for sale in sales:
             with savepoint(self.env.cr):
-                self._do_sale_done(sale.with_company(sale.company_id), sale_done_filter)
+                self._do_sale_lock(sale.with_company(sale.company_id), sale_lock_filter)
 
     def _prepare_dict_account_payment(self, invoice):
         partner_type = (
@@ -212,9 +211,9 @@ class AutomaticWorkflowJob(models.Model):
                 safe_eval(sale_workflow.validate_invoice_filter_id.domain)
                 + workflow_domain
             )
-        if sale_workflow.sale_done:
-            self._sale_done(
-                safe_eval(sale_workflow.sale_done_filter_id.domain) + workflow_domain
+        if sale_workflow.sale_lock:
+            self._sale_lock(
+                safe_eval(sale_workflow.sale_lock_filter_id.domain) + workflow_domain
             )
 
         if sale_workflow.register_payment:

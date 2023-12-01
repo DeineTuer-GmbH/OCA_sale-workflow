@@ -34,7 +34,6 @@ class TestMultiCompany(TestCommon):
                 _job_force_sync=True,
             )
         )
-        coa = cls.env.user.company_id.chart_template_id
         cls.company_fr = cls.create_company(
             {
                 "name": "French company",
@@ -73,7 +72,9 @@ class TestMultiCompany(TestCommon):
         cls.env.user.company_ids |= cls.company_fr_daughter
 
         cls.env.user.company_id = cls.company_fr.id
-        coa.try_loading(company=cls.env.user.company_id)
+        cls.env["account.chart.template"].try_loading(
+            "generic_coa", cls.env.user.company_id
+        )
         cls.customer_fr = (
             cls.env["res.partner"]
             .with_context(default_company_id=cls.company_fr.id)
@@ -82,14 +83,18 @@ class TestMultiCompany(TestCommon):
         cls.product_fr = cls.create_product({"name": "Evian bottle", "list_price": 2.0})
 
         cls.env.user.company_id = cls.company_ch.id
-        coa.try_loading(company=cls.env.user.company_id)
+        cls.env["account.chart.template"].try_loading(
+            "generic_coa", cls.env.user.company_id
+        )
         cls.customer_ch = cls.env["res.partner"].create({"name": "Customer CH"})
         cls.product_ch = cls.create_product(
             {"name": "Henniez bottle", "list_price": 3.0}
         )
 
         cls.env.user.company_id = cls.company_be.id
-        coa.try_loading(company=cls.env.user.company_id)
+        cls.env["account.chart.template"].try_loading(
+            "generic_coa", cls.env.user.company_id
+        )
         cls.customer_be = cls.env["res.partner"].create({"name": "Customer BE"})
         cls.product_be = (
             cls.env["product.template"]
@@ -105,7 +110,9 @@ class TestMultiCompany(TestCommon):
         )
 
         cls.env.user.company_id = cls.company_fr_daughter.id
-        coa.try_loading(company=cls.env.user.company_id)
+        cls.env["account.chart.template"].try_loading(
+            "generic_coa", cls.env.user.company_id
+        )
         cls.customer_fr_daughter = cls.env["res.partner"].create(
             {"name": "Customer FR Daughter"}
         )

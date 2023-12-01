@@ -68,9 +68,9 @@ class SaleWorkflowProcess(models.Model):
         "The service sale order lines will be included and will be "
         "marked as delivered",
     )
-    sale_done = fields.Boolean()
-    sale_done_filter_domain = fields.Text(
-        string="Sale Done Filter Domain", related="sale_done_filter_id.domain"
+    sale_lock = fields.Boolean()
+    sale_lock_filter_domain = fields.Text(
+        string="Sale Lock Filter Domain", related="sale_lock_filter_id.domain"
     )
     warning = fields.Text(
         "Warning Message",
@@ -112,11 +112,11 @@ class SaleWorkflowProcess(models.Model):
             "sale_automatic_workflow." "automatic_workflow_validate_invoice_filter"
         ),
     )
-    sale_done_filter_id = fields.Many2one(
+    sale_lock_filter_id = fields.Many2one(
         "ir.filters",
-        string="Sale Done Filter",
+        string="Sale Lock Filter",
         default=lambda self: self._default_filter(
-            "sale_automatic_workflow.automatic_workflow_sale_done_filter"
+            "sale_automatic_workflow.automatic_workflow_sale_lock_filter"
         ),
     )
     payment_filter_id = fields.Many2one(
