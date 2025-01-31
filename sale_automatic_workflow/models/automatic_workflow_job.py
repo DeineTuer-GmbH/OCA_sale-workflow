@@ -28,34 +28,34 @@ def savepoint(cr):
 class AutomaticWorkflowJob(models.Model):
     """Scheduler that will play automatically the validation of
     invoices, pickings..."""
-    
+
     _name = "automatic.workflow.job"
     _description = (
         "Scheduler that will play automatically the validation of"
         " invoices, pickings..."
     )
-    
+
     def _do_validate_sale_order(self, sale, domain_filter):
         """Validate a sales order, filter ensure no duplication"""
         if not self.env["sale.order"].search_count(
-                [("id", "=", sale.id)] + domain_filter
+            [("id", "=", sale.id)] + domain_filter
         ):
             return f"{sale.display_name} {sale} job bypassed"
         sale.action_confirm()
         return f"{sale.display_name} {sale} confirmed successfully"
-    
+
     def _do_send_order_confirmation_mail(self, sale):
         """Send order confirmation mail, while filtering to make sure the order is
         confirmed with _do_validate_sale_order() function"""
         if not self.env["sale.order"].search_count(
-                [("id", "=", sale.id), ("state", "=", "sale")]
+            [("id", "=", sale.id), ("state", "=", "sale")]
         ):
             return f"{sale.display_name} {sale} job bypassed"
         if sale.user_id:
             sale = sale.with_user(sale.user_id)
         sale._send_order_confirmation_mail()
         return f"{sale.display_name} {sale} send order confirmation mail successfully"
-    
+
     @api.model
     def _validate_sale_orders(self, order_filter):
         sale_obj = self.env["sale.order"]
@@ -68,11 +68,11 @@ class AutomaticWorkflowJob(models.Model):
                 )
                 if self.env.context.get("send_order_confirmation_mail"):
                     self._do_send_order_confirmation_mail(sale)
-    
+
     def _do_create_invoice(self, sale, domain_filter):
         """Create an invoice for a sales order, filter ensure no duplication"""
         if not self.env["sale.order"].search_count(
-                [("id", "=", sale.id)] + domain_filter
+            [("id", "=", sale.id)] + domain_filter
         ):
             return f"{sale.display_name} {sale} job bypassed"
         payment = self.env["sale.advance.payment.inv"].create(
@@ -80,7 +80,7 @@ class AutomaticWorkflowJob(models.Model):
         )
         payment.with_context(active_model="sale.order").create_invoices()
         return f"{sale.display_name} {sale} create invoice successfully"
-    
+
     @api.model
     def _create_invoices(self, create_filter):
         sale_obj = self.env["sale.order"]
@@ -91,16 +91,16 @@ class AutomaticWorkflowJob(models.Model):
                 self._do_create_invoice(
                     sale.with_company(sale.company_id), create_filter
                 )
-    
+
     def _do_validate_invoice(self, invoice, domain_filter):
         """Validate an invoice, filter ensure no duplication"""
         if not self.env["account.move"].search_count(
-                [("id", "=", invoice.id)] + domain_filter
+            [("id", "=", invoice.id)] + domain_filter
         ):
             return f"{invoice.display_name} {invoice} job bypassed"
         invoice.with_company(invoice.company_id).action_post()
         return f"{invoice.display_name} {invoice} validate invoice successfully"
-    
+
     @api.model
     def _validate_invoices(self, validate_invoice_filter):
         move_obj = self.env["account.move"]
@@ -111,28 +111,25 @@ class AutomaticWorkflowJob(models.Model):
                 self._do_validate_invoice(
                     invoice.with_company(invoice.company_id), validate_invoice_filter
                 )
-    
+
     def _do_send_invoice(self, invoice, domain_filter):
         """Validate an invoice, filter ensure no duplication"""
         if not self.env["account.move"].search_count(
-                [("id", "=", invoice.id)] + domain_filter
+            [("id", "=", invoice.id)] + domain_filter
         ):
             return f"{invoice.display_name} {invoice} job bypassed"
-        
-        move_template = self.env.ref('account.email_template_edi_invoice')
+
+        move_template = self.env.ref("account.email_template_edi_invoice")
         invoice_send_wizard = (
             self.env["account.move.send"]
             .with_context(active_model="account.move", active_ids=invoice.ids)
-            .create({
-                "checkbox_download": False,
-                'mail_template_id': move_template.id
-            })
+            .create({"checkbox_download": False, "mail_template_id": move_template.id})
         )
-        
+
         invoice_send_wizard.action_send_and_print(force_synchronous=True)
-        
+
         return f"{invoice.display_name} {invoice} sent invoice successfully"
-    
+
     @api.model
     def _send_invoices(self, send_invoice_filter):
         move_obj = self.env["account.move"]
@@ -143,16 +140,16 @@ class AutomaticWorkflowJob(models.Model):
                 self._do_send_invoice(
                     invoice.with_company(invoice.company_id), send_invoice_filter
                 )
-    
+
     def _do_sale_done(self, sale, domain_filter):
         """Set a sales order to done, filter ensure no duplication"""
         if not self.env["sale.order"].search_count(
-                [("id", "=", sale.id)] + domain_filter
+            [("id", "=", sale.id)] + domain_filter
         ):
             return f"{sale.display_name} {sale} job bypassed"
         sale.action_done()
         return f"{sale.display_name} {sale} set done successfully"
-    
+
     @api.model
     def _sale_done(self, sale_done_filter):
         sales = self.env["sale.order"].search(sale_done_filter)
@@ -160,12 +157,12 @@ class AutomaticWorkflowJob(models.Model):
         for sale in sales:
             with savepoint(self.env.cr):
                 self._do_sale_done(sale.with_company(sale.company_id), sale_done_filter)
-    
+
     def _prepare_dict_account_payment(self, invoice):
         partner_type = (
-                invoice.move_type in ("out_invoice", "out_refund")
-                and "customer"
-                or "supplier"
+            invoice.move_type in ("out_invoice", "out_refund")
+            and "customer"
+            or "supplier"
         )
         return {
             "reconciled_invoice_ids": [(6, 0, invoice.ids)],
@@ -174,7 +171,7 @@ class AutomaticWorkflowJob(models.Model):
             "partner_type": partner_type,
             "date": fields.Date.context_today(self),
         }
-    
+
     @api.model
     def _register_payments(self, payment_filter):
         invoice_obj = self.env["account.move"]
@@ -184,13 +181,13 @@ class AutomaticWorkflowJob(models.Model):
             with savepoint(self.env.cr):
                 self._register_payment_invoice(invoice)
         return
-    
+
     def _register_payment_invoice(self, invoice):
         payment = self.env["account.payment"].create(
             self._prepare_dict_account_payment(invoice)
         )
         payment.action_post()
-        
+
         domain = [
             ("account_type", "in", ("asset_receivable", "liability_payable")),
             ("reconciled", "=", False),
@@ -201,11 +198,11 @@ class AutomaticWorkflowJob(models.Model):
             (payment_lines + lines).filtered_domain(
                 [("account_id", "=", account.id), ("reconciled", "=", False)]
             ).reconcile()
-    
+
     @api.model
     def _handle_pickings(self, sale_workflow):
         pass
-    
+
     @api.model
     def run_with_workflow(self, sale_workflow):
         workflow_domain = [("workflow_process_id", "=", sale_workflow.id)]
@@ -234,12 +231,12 @@ class AutomaticWorkflowJob(models.Model):
             self._sale_done(
                 safe_eval(sale_workflow.sale_done_filter_id.domain) + workflow_domain
             )
-        
+
         if sale_workflow.register_payment:
             self._register_payments(
                 safe_eval(sale_workflow.payment_filter_id.domain) + workflow_domain
             )
-    
+
     @api.model
     def run(self):
         """Must be called from ir.cron"""
